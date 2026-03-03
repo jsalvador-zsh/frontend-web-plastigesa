@@ -80,7 +80,7 @@ export const metadata: Metadata = {
     images: ["/screenshot-web.png"],
   },
   verification: {
-    google: "", // Agregar el código de verificación de Google Search Console aquí
+    google: "-FTSnpKg_WNEIbuIoWn9FhPc-wEHaCdrFDt3ortr33g",
   },
 }
 
