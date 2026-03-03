@@ -141,17 +141,53 @@
   }
   :root {
     scroll-behavior: smooth;
+
+    /* ── Brand colors Plastigesa ───────────────────── */
+    --brand: oklch(0.52 0.17 145);
+    --brand-light: oklch(0.70 0.16 145);
+    --brand-dark: oklch(0.36 0.14 145);
+    --brand-foreground: oklch(1 0 0);
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Geist Variable', sans-serif;
-    /* display: grid;
-    grid-template-rows: auto 1fr auto;
-    min-height: 100vh; */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ── Selection color ───────────────────────────── */
+  ::selection {
+    background-color: oklch(0.70 0.16 145 / 0.3);
+    color: oklch(0.2 0 0);
+  }
+
+  /* ── Scrollbar premium ─────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.52 0.17 145 / 0.5);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.52 0.17 145 / 0.8);
   }
 }
-/* globals.css o en una devtool */
 
 html, body {
   overflow-x: hidden;
+}
+
+/* ── Utilidad: text-balance global ─────────────── */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* ── Fade-in suave para cambios de página ──────── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+main {
+  animation: page-enter 0.4s ease-out both;
 }

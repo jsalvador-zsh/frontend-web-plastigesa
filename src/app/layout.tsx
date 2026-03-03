@@ -8,6 +8,7 @@ import { fetchGlobalData } from "@/lib/strapi"
 import Script from "next/script"
 
 import { AOSInitializer } from "@/components/AOSInitializer"
+import { ThemeProvider } from "@/components/providers/theme-provider"
 
 export const metadata: Metadata = {
   title: "Plastigesa",
@@ -28,12 +29,14 @@ export default async function RootLayout({
         <link rel="icon" type="image/x-icon" href="/favicon.svg" />
         <meta httpEquiv="Permissions-Policy" content="fullscreen=(self)" />
       </head>
-      <body>
-        <AOSInitializer />
-        {/* <Banner data={globalData.banner} /> */}
-        <Header data={globalData.header} />
-        {children}
-        <Footer data={globalData.footer} />
+      <body className="pt-16">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AOSInitializer />
+          {/* <Banner data={globalData.banner} /> */}
+          <Header data={globalData.header} />
+          {children}
+          <Footer data={globalData.footer} />
+        </ThemeProvider>
         <Script
           id="chatwoot"
           strategy="afterInteractive"

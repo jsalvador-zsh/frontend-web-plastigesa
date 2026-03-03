@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -13,10 +13,20 @@ import {
   Linkedin,
   Link2,
   Share2,
+  ArrowLeft,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { getStrapiMedia } from "@/lib/strapi"
+
+// GSAP Animations
+import gsap from "gsap"
+import { useGSAP } from "@gsap/react"
+import ScrollTrigger from "gsap/ScrollTrigger"
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger)
+}
 
 interface BlogArticleClientProps {
   article: {
@@ -47,9 +57,82 @@ interface BlogArticleClientProps {
 }
 
 export default function BlogArticleClient({ article }: BlogArticleClientProps) {
-  const [isBookmarked, setIsBookmarked] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
-  const [likes, setLikes] = useState(Math.floor(Math.random() * 50) + 10) // Número aleatorio para demo
+  const containerRef = useRef<HTMLDivElement>(null)
+  const imageRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
+
+  // GSAP: Parallax Hero Image + Fade in Texto
+  useGSAP(() => {
+    // Reveal Incial
+    const tl = gsap.timeline()
+
+    tl.fromTo(
+      ".article-title",
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+    )
+      .fromTo(
+        ".article-meta",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power2.out" },
+        "-=0.4"
+      )
+      .fromTo(
+        imageRef.current,
+        { opacity: 0, scale: 0.95, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power3.out" },
+        "-=0.5"
+      )
+
+    // Scroll Parallax en la Imagen Hero
+    if (imageRef.current) {
+      gsap.to(imageRef.current.querySelector("img"), {
+        y: "15%",
+        ease: "none",
+        scrollTrigger: {
+          trigger: imageRef.current,
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
+        }
+      })
+    }
+
+    // Progress Bar y Content Fade
+    if (contentRef.current) {
+      gsap.to(".progress-bar", {
+        scaleX: 1,
+        ease: "none",
+        scrollTrigger: {
+          trigger: document.body,
+          start: "top top",
+          end: "bottom bottom",
+          scrub: 0.2, // suavizar lectura
+        }
+      })
+
+      // Aparición perezosa párrafos markdown
+      gsap.fromTo(
+        contentRef.current.querySelectorAll("p, h2, h3, blockquote, ul"),
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.1,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: contentRef.current,
+            start: "top 80%",
+            end: "bottom center",
+            // Solo una vez
+          }
+        }
+      )
+    }
+
+  }, { scope: containerRef })
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
@@ -60,22 +143,13 @@ export default function BlogArticleClient({ article }: BlogArticleClientProps) {
   }
 
   const getAuthorInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
   }
 
   const calculateReadTime = (content: string) => {
     const wordsPerMinute = 200
     const wordCount = content.split(/\s+/).length
     return Math.ceil(wordCount / wordsPerMinute)
-  }
-
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-    setLikes((prev) => (isLiked ? prev - 1 : prev + 1))
   }
 
   const handleShare = (platform: string) => {
@@ -94,30 +168,21 @@ export default function BlogArticleClient({ article }: BlogArticleClientProps) {
         break
       case "copy":
         navigator.clipboard.writeText(url)
-        // Aquí podrías mostrar un toast de confirmación
         alert("Enlace copiado al portapapeles")
         break
     }
   }
 
-  // Convertir markdown básico a HTML
   const convertMarkdownToHtml = (markdown: string) => {
     return markdown
-      // Headers
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      // Bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Italic text
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Lists
       .replace(/^- (.*$)/gim, '<li>$1</li>')
-      // Wrap consecutive <li> elements in <ul>
       .replace(/(<li>.*<\/li>\s*)+/g, (match) => `<ul>${match}</ul>`)
-      // Blockquotes
       .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
-      // Line breaks to paragraphs
       .split('\n')
       .map(line => {
         line = line.trim()
@@ -130,126 +195,140 @@ export default function BlogArticleClient({ article }: BlogArticleClientProps) {
   const readTime = article.time || calculateReadTime(article.content)
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header con navegación */}
-      {/* <div className="border-b">
-        <div className="container mx-auto px-4 py-4 max-w-4xl">
-          <Button asChild className="mb-4">
-            <Link href="/blog">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver al blog
-            </Link>
-          </Button>
-        </div>
-      </div> */}
+    <div className="min-h-screen bg-background relative" ref={containerRef}>
+      {/* Scroll Progress Bar global */}
+      <div className="progress-bar fixed top-0 left-0 right-0 h-1.5 bg-green-500 scale-x-0 origin-left z-50 pointer-events-none" />
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Imagen principal */}
-        {article.featuredImage?.url && (
-          <div className="relative aspect-video overflow-hidden rounded-lg mb-8">
-            <Image
-              src={getStrapiMedia(article.featuredImage.url)}
-              alt={article.featuredImage.alternativeText || article.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 896px) 100vw, 896px"
-              priority
-            />
-          </div>
-        )}
+      {/* Hero Header Minimalista */}
+      <div className="container mx-auto px-6 max-w-4xl pt-24 pb-8" ref={headerRef}>
 
-        {/* Metadatos del artículo */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-4 leading-tight">{article.title}</h1>
+        {/* Breadcrumb / Botón volver */}
+        <Link
+          href="/blog"
+          className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-green-600 transition-colors mb-8 article-meta"
+        >
+          <ArrowLeft className="size-4 mr-2" />
+          Volver a artículos
+        </Link>
 
-          <p className="text-xl text-muted-foreground mb-6 leading-relaxed">{article.description}</p>
+        <div className="space-y-6">
+          <Badge className="article-meta bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/60 border-0 rounded-full px-3 shadow-none">
+            {article.contentTags && article.contentTags.length > 0 ? article.contentTags[0].title : 'Noticias'}
+          </Badge>
 
-          {/* Información del autor y fecha */}
-          <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-12 w-12">
-                <AvatarImage 
-                  src={getStrapiMedia(article.author.image?.url)} 
+          <h1 className="article-title text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none text-balance text-foreground">
+            {article.title}
+          </h1>
+
+          <p className="article-meta text-xl md:text-2xl text-muted-foreground leading-relaxed text-pretty max-w-3xl">
+            {article.description}
+          </p>
+
+          <div className="article-meta flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-border/80">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-12 ring-2 ring-primary/5">
+                <AvatarImage
+                  src={getStrapiMedia(article.author.image?.url)}
                   alt={article.author.fullName}
                   className="object-cover"
                 />
-                <AvatarFallback>{getAuthorInitials(article.author.fullName)}</AvatarFallback>
+                <AvatarFallback className="bg-green-100 text-green-800 font-semibold">{getAuthorInitials(article.author.fullName)}</AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-semibold">{article.author.fullName}</p>
-                {article.author.bio && (
-                  <p className="text-sm text-muted-foreground">{article.author.bio}</p>
-                )}
-                <div className="flex items-center text-sm text-muted-foreground space-x-4 mt-1">
-                  <div className="flex items-center">
-                    <CalendarDays className="h-4 w-4 mr-1" />
-                    {article.date}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {readTime} min de lectura
-                  </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-foreground leading-none">{article.author.fullName}</p>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <span className="flex items-center"><CalendarDays className="size-3.5 mr-1" />{article.date}</span>
+                  <span className="flex items-center text-green-700/80 font-medium"><Clock className="size-3.5 mr-1 text-green-600" />{readTime} min read</span>
                 </div>
               </div>
             </div>
 
-            {/* Acciones del artículo */}
-            <div className="flex items-center space-x-2">
-              {/* Botones de compartir */}
-              <div className="flex items-center space-x-1">
-                <Button variant="outline" size="sm" onClick={() => handleShare("twitter")}>
-                  <Twitter className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleShare("facebook")}>
-                  <Facebook className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleShare("linkedin")}>
-                  <Linkedin className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleShare("copy")}>
-                  <Link2 className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="icon" className="rounded-full shadow-sm dark:bg-white/5 dark:hover:bg-white/10 dark:border dark:border-white/10" onClick={() => handleShare("twitter")}>
+                <Twitter className="size-4 text-foreground/70 dark:text-foreground/90" />
+              </Button>
+              <Button variant="secondary" size="icon" className="rounded-full shadow-sm dark:bg-white/5 dark:hover:bg-white/10 dark:border dark:border-white/10" onClick={() => handleShare("facebook")}>
+                <Facebook className="size-4 text-foreground/70 dark:text-foreground/90" />
+              </Button>
+              <Button variant="secondary" size="icon" className="rounded-full shadow-sm dark:bg-white/5 dark:hover:bg-white/10 dark:border dark:border-white/10" onClick={() => handleShare("linkedin")}>
+                <Linkedin className="size-4 text-foreground/70 dark:text-foreground/90" />
+              </Button>
+              <Button variant="secondary" size="icon" className="rounded-full shadow-sm dark:bg-white/5 dark:hover:bg-white/10 dark:border dark:border-white/10" onClick={() => handleShare("copy")}>
+                <Link2 className="size-4 text-foreground/70 dark:text-foreground/90" />
+              </Button>
             </div>
           </div>
-
-          {/* Tags */}
-          {article.contentTags && article.contentTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-8">
-              {article.contentTags.map((tag) => (
-                <Badge key={tag.id} variant="outline">
-                  #{tag.title}
-                </Badge>
-              ))}
-            </div>
-          )}
         </div>
+      </div>
 
-        <Separator className="mb-8" />
+      <div className="container mx-auto px-6 max-w-5xl mb-12">
+        {/* Imagen principal envolvente con Parallax GSAP */}
+        {article.featuredImage?.url && (
+          <div
+            ref={imageRef}
+            className="relative aspect-[21/9] w-full overflow-hidden rounded-[2rem] shadow-2xl bg-muted"
+          >
+            <Image
+              src={getStrapiMedia(article.featuredImage.url)!}
+              alt={article.featuredImage.alternativeText || article.title}
+              fill
+              className="object-cover scale-110"
+              // scale-110 necesario por el offset the GSAP translate Y parallax
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              priority
+            />
+            {/* Soft gradient overlay para enmarcar */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/0 to-transparent pointer-events-none" />
+          </div>
+        )}
+      </div>
 
-        {/* Contenido del artículo con Tailwind Typography */}
-        <article 
-          className="prose prose-lg max-w-none mb-12 prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-blockquote:text-muted-foreground prose-blockquote:border-l-border prose-li:text-foreground"
+      {/* Markdown Content con GSAP text reveals */}
+      <div className="container mx-auto px-6 max-w-3xl pb-24">
+        <article
+          ref={contentRef}
+          className="prose prose-lg md:prose-xl prose-headings:font-bold prose-headings:tracking-tight prose-a:text-green-600 dark:prose-a:text-green-500 hover:prose-a:text-green-500 dark:hover:prose-a:text-green-400 prose-img:rounded-xl prose-img:shadow-lg prose-blockquote:border-l-4 prose-blockquote:border-green-500 prose-blockquote:bg-green-50/50 dark:prose-blockquote:bg-green-950/30 prose-blockquote:py-2 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-foreground/90 max-w-none mb-16 text-foreground/90 font-serif leading-relaxed text-pretty"
           dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(article.content) }}
         />
 
-        <Separator className="mb-8" />
+        <Separator className="mb-12" />
 
-        {/* Call to action final */}
-        <div className="text-center bg-muted/50 rounded-lg p-8">
-          <h3 className="text-2xl font-bold mb-4">¿Te gustó este artículo?</h3>
-          <p className="text-muted-foreground mb-6">
-            Descubre más contenido sobre productos plásticos industriales y agricultura.
+        {/* Tags Foot */}
+        {article.contentTags && article.contentTags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-16">
+            <span className="text-sm font-semibold mr-2 self-center text-muted-foreground">Etiquetas: </span>
+            {article.contentTags.map((tag) => (
+              <Badge key={tag.id} variant="secondary" className="bg-muted hover:bg-muted/80 text-foreground font-normal px-3 py-1 rounded-sm shadow-none">
+                #{tag.title}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* CTA Banner de lectura finalizado */}
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/40 dark:to-emerald-950/20 rounded-3xl p-10 text-center border border-green-100/50 dark:border-green-900/30 shadow-sm relative overflow-hidden">
+          <div className="absolute -inset-x-20 top-0 h-40 bg-white/20 dark:bg-green-900/10 blur-[60px] rounded-full pointer-events-none" />
+
+          <h3 className="text-2xl font-bold mb-3 text-green-950 dark:text-green-50">¿Te resultó útil?</h3>
+          <p className="text-green-800/80 dark:text-green-200/70 mb-8 max-w-md mx-auto text-balance">
+            Ayúdanos a llegar a más personas compartiendo este artículo con tus colegas o redes.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild>
-              <Link href="/blog">
-                Ver más artículos
-              </Link>
-            </Button>
-            <Button variant="outline" onClick={() => handleShare("copy")}>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <Button
+              className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white rounded-full px-8 shadow-green-900/10 dark:shadow-green-900/20 shadow-lg transition-transform hover:scale-105 active:scale-95"
+              onClick={() => handleShare("copy")}
+            >
               <Share2 className="h-4 w-4 mr-2" />
-              Compartir artículo
+              Copiar Enlace
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-full px-8 bg-white dark:bg-background hover:bg-gray-50 dark:hover:bg-muted text-foreground border-border/60 hover:border-border transition-transform hover:scale-105 active:scale-95"
+              asChild
+            >
+              <Link href="/blog">
+                Leer más artículos
+              </Link>
             </Button>
           </div>
         </div>
