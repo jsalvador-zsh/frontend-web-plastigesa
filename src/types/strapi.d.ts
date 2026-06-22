@@ -289,3 +289,39 @@ export type DynamicBlock =
   | BlockTestimonials
   | BlockCtaBanner
   | BlockRichText
+
+export interface Page {
+  id: number
+  documentId: string
+  title: string
+  description: string | null
+  slug: string
+  createdAt: string
+  updatedAt: string
+  publishedAt: string
+  locale: string
+  blocks: DynamicBlock[]
+}
+
+export interface Job {
+  id: number
+  documentId: string
+  position: string
+  slug: string
+  departament: string | null
+  place: string | null
+  time: string | null
+  description: string | null
+  requirements: RichText[]
+  statusJob: 'Disponible' | 'No disponible' | null
+  employmentType: 'FULL_TIME' | 'PART_TIME' | 'CONTRACTOR' | 'TEMPORARY' | 'INTERN' | null
+  validThrough: string | null
+  salaryMin: number | null
+  salaryMax: number | null
+  currency: string | null
+  link: Link[]
+  createdAt: string
+  updatedAt: string
+  publishedAt: string
+  locale: string
+}

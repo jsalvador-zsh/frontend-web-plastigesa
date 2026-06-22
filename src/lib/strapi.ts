@@ -49,6 +49,90 @@ export async function fetchLandingPage() {
   return (data as any).data
 }
 
+// ─── Páginas dinámicas ─────────────────────────────────────────────────────
+
+export async function getAllPageSlugs(): Promise<string[]> {
+  try {
+    const data = await strapiRequest<{ data: { slug: string }[] }>(
+      "/pages",
+      { fields: ["slug"], "pagination[pageSize]": 1000 },
+      { next: { revalidate: 60 } }
+    )
+    return data.data.map((item) => item.slug).filter(Boolean)
+  } catch (error) {
+    console.error("Error en getAllPageSlugs:", error)
+    return []
+  }
+}
+
+export async function getPageBySlug(slug: string) {
+  try {
+    // El middleware `page-populate` inyecta el populate de los bloques en find.
+    const data = await strapiRequest<{ data: any[] }>(
+      "/pages",
+      { filters: { slug: { $eq: slug } } },
+      { next: { revalidate: 60 } }
+    )
+    return data.data?.[0] ?? null
+  } catch (error) {
+    console.error("Error en getPageBySlug:", error)
+    return null
+  }
+}
+
+// ─── Empleos / Reclutamiento ────────────────────────────────────────────────
+
+export async function getAllJobs() {
+  try {
+    // El middleware `job-populate` inyecta el populate (requirements, link) en find.
+    const data = await strapiRequest<{ data: any[] }>(
+      "/jobs",
+      {
+        filters: { statusJob: { $eq: "Disponible" } },
+        sort: "publishedAt:desc",
+        "pagination[pageSize]": 100,
+      },
+      { next: { revalidate: 60 } }
+    )
+    return data.data ?? []
+  } catch (error) {
+    console.error("Error en getAllJobs:", error)
+    return []
+  }
+}
+
+export async function getAllJobSlugs(): Promise<string[]> {
+  try {
+    const data = await strapiRequest<{ data: { slug: string }[] }>(
+      "/jobs",
+      {
+        filters: { statusJob: { $eq: "Disponible" } },
+        fields: ["slug"],
+        "pagination[pageSize]": 1000,
+      },
+      { next: { revalidate: 60 } }
+    )
+    return data.data.map((item) => item.slug).filter(Boolean)
+  } catch (error) {
+    console.error("Error en getAllJobSlugs:", error)
+    return []
+  }
+}
+
+export async function getJobBySlug(slug: string) {
+  try {
+    const data = await strapiRequest<{ data: any[] }>(
+      "/jobs",
+      { filters: { slug: { $eq: slug } } },
+      { next: { revalidate: 60 } }
+    )
+    return data.data?.[0] ?? null
+  } catch (error) {
+    console.error("Error en getJobBySlug:", error)
+    return null
+  }
+}
+
 // ─── Artículos ───────────────────────────────────────────────────────────────
 
 const ARTICLE_POPULATE = {
