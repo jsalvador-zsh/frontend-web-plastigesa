@@ -50,32 +50,57 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El CV supera los 5 MB." }, { status: 400 })
     }
 
-    // ── Crear la postulación + subir el CV en una sola petición multipart ──
-    const strapiForm = new FormData()
-    strapiForm.append(
-      "data",
-      JSON.stringify({
-        fullName,
-        email,
-        phone: phone || undefined,
-        message: message || undefined,
-        job: jobId,
-        applicationStatus: "Nuevo",
-      })
-    )
-    strapiForm.append("files.cv", cv, cv.name)
+    // Strapi v5 no parsea el `data` JSON de un multipart en content-API, así que
+    // se hace en 2 pasos: 1) crear la entrada con JSON, 2) subir el CV y enlazarlo.
+    const authHeader = { Authorization: `Bearer ${STRAPI_TOKEN}` }
 
-    const res = await fetch(`${STRAPI_URL}/api/applications`, {
+    // ── Paso 1: crear la postulación ──────────────────────────────────────
+    const createRes = await fetch(`${STRAPI_URL}/api/applications`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${STRAPI_TOKEN}` },
-      body: strapiForm,
+      headers: { ...authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          fullName,
+          email,
+          phone: phone || undefined,
+          message: message || undefined,
+          job: jobId,
+          applicationStatus: "Nuevo",
+        },
+      }),
     })
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "")
-      console.error("Error creando application en Strapi:", res.status, detail)
+    if (!createRes.ok) {
+      const detail = await createRes.text().catch(() => "")
+      console.error("Error creando application en Strapi:", createRes.status, detail)
       return NextResponse.json(
         { error: "No se pudo registrar tu postulación. Intenta más tarde." },
+        { status: 502 }
+      )
+    }
+
+    const created = await createRes.json()
+    const appId = created?.data?.id
+
+    // ── Paso 2: subir el CV y enlazarlo al campo `cv` de la postulación ────
+    const uploadForm = new FormData()
+    uploadForm.append("ref", "api::application.application")
+    uploadForm.append("refId", String(appId))
+    uploadForm.append("field", "cv")
+    uploadForm.append("files", cv, cv.name)
+
+    const uploadRes = await fetch(`${STRAPI_URL}/api/upload`, {
+      method: "POST",
+      headers: authHeader,
+      body: uploadForm,
+    })
+
+    if (!uploadRes.ok) {
+      // La postulación quedó creada aunque el CV falle; lo registramos y avisamos.
+      const detail = await uploadRes.text().catch(() => "")
+      console.error("Error subiendo el CV en Strapi:", uploadRes.status, detail)
+      return NextResponse.json(
+        { error: "Registramos tus datos, pero no se pudo adjuntar el CV. Intenta de nuevo." },
         { status: 502 }
       )
     }
